@@ -8,6 +8,9 @@ use std::{fmt, str::FromStr, time::Duration};
 
 use crate::parse_uci_command;
 
+#[cfg(feature = "types")]
+use crate::UciMove;
+
 /// A command sent from a GUI to an engine.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum UciCommand {
@@ -183,6 +186,9 @@ pub enum UciCommand {
         fen: Option<String>,
 
         /// A list of moves to apply to the provided/default position.
+        #[cfg(feature = "types")]
+        moves: Vec<UciMove>,
+        #[cfg(not(feature = "types"))]
         moves: Vec<String>,
     },
 
@@ -436,6 +442,10 @@ pub struct UciSearchOptions {
     /// Example: After `position startpos` and `go infinite searchmoves e2e4 d2d4`
     /// the engine should only search the two moves `e2e4` and `d2d4` in the initial
     /// position.
+    #[cfg(feature = "types")]
+    pub searchmoves: Vec<UciMove>,
+
+    #[cfg(not(feature = "types"))]
     pub searchmoves: Vec<String>,
 
     /// ```text
