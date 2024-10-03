@@ -7,7 +7,7 @@ license = "MPL-2.0"
 description = "Universal Chess Interface parser"
 repository = "https://github.com/dannyhammer/uci-parser"
 homepage = "https://github.com/dannyhammer/uci-parser"
-keywords = ["chess", "chess parser", "universal chess interface", "uci", "parser", "uci parser"]
+keywords = ["chess", "uci", "parser"]
 
 [dependencies]
 nom = "7.1.3"
