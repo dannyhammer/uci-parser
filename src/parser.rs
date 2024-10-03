@@ -127,7 +127,7 @@ fn parse_go_args(input: &str) -> IResult<&str, UciCommand> {
 /// Parses individual arguments to the `go` command into a [`UsiSearchOptions`] struct.
 ///
 /// This is in it's own function because [`UciSearchOptions`] is used by both `go` and `bench`.
-fn parse_search_options<'a>(input: &'a str) -> IResult<&'a str, UciSearchOptions> {
+fn parse_search_options(input: &str) -> IResult<&str, UciSearchOptions> {
     let mut opt = UciSearchOptions::default();
 
     // Arguments to `go` can be in any order
@@ -175,7 +175,7 @@ fn term<'a>(ident: &'a str) -> impl FnMut(&'a str) -> IResult<&'a str, &'a str> 
 }
 
 /// A parser to consume the remainder of `input`, erroring with a [`nom::Err::Failure`] if there is no remaining input.
-fn rest_nonempty<'a>(input: &'a str) -> IResult<&'a str, &'a str> {
+fn rest_nonempty(input: &str) -> IResult<&str, &str> {
     recognize(cut(many1_count(anychar)))(input)
 }
 

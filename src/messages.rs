@@ -359,7 +359,7 @@ impl fmt::Display for UciCommand {
     /// The formatted string will almost always be identical to the source it was
     /// parsed from, with the following exceptions:
     /// 1. Parameters to commands like [`UciCommand::Go`] will have a fixed order,
-    /// regardless of how they were originally supplied.
+    ///     regardless of how they were originally supplied.
     /// 2. Leading/trailing/excessive whitespace is parsed out.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use UciCommand::*;
@@ -591,5 +591,635 @@ impl fmt::Display for UciSearchOptions {
         }
 
         Ok(())
+    }
+}
+
+/*************************************************************************************************/
+/*                                 ENGINE TO GUI COMMUNICATION                                   */
+/*************************************************************************************************/
+
+/// # Responses sent from the Engine to the GUI via `stdout`.
+///
+/// These are all the commands the interface gets from the engine.
+#[derive(Debug, Clone)]
+pub enum UciResponse<T = String> {
+    /// ```text
+    /// id name <x>
+    /// id author <x>
+    /// ```
+    Id { name: T, author: T },
+
+    /// ```text
+    /// uciok
+    /// ```
+    UciOk,
+
+    /// ```text
+    /// readyok
+    /// ```
+    ReadyOk,
+
+    /// ```text
+    /// bestmove <move_1> [ponder <move_2>]
+    /// ```
+    ///
+    /// If the `bestmove` field is `None`, this will be printed as
+    /// `bestmove (none) [ponder <ponder>]`.
+    BestMove {
+        bestmove: Option<T>,
+        ponder: Option<T>,
+    },
+
+    /// ```text
+    /// copyprotection [checking | ok | error]
+    /// ```
+    CopyProtection(UciCheckingStatus),
+
+    /// ```text
+    /// registration [checking | ok | error]
+    /// ```
+    Registration(UciCheckingStatus),
+
+    /// ```text
+    /// info [depth <x>] [seldepth <x>] [time <x>] [nodes <x>] [pv <move_1> [<move_2> ... <move_i>]] [score [cp <x> | mate <y>] [lowerbound | upperbound]] [currmove <move>] [currmovenumber <x>] [hashfull <x>] [nps <x>] [tbhits <x>] [sbhits <x>] [cpuload <x>] [string <str>] [refutation <move_1> <move_2> [... <move_i>]] [currline [cpunr] <move_1> [... <move_i>]]
+    /// ```
+    Info(Box<UciInfo>),
+
+    /// ```text
+    /// option name <id> type <t> [default <x>] [min <x>] [max <x>] [var <x>]
+    /// ```
+    Option(UciOption<T>),
+}
+
+impl<T: fmt::Display> fmt::Display for UciResponse<T> {
+    /// Responses are formatted to display appropriately according to the UCI specifications.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Id { name, author } => write!(f, "id name {name}\nid author {author}"),
+            Self::UciOk => write!(f, "uciok"),
+            Self::ReadyOk => write!(f, "readyok"),
+            Self::BestMove { bestmove, ponder } => match (bestmove, ponder) {
+                (Some(b), Some(p)) => write!(f, "bestmove {b} ponder {p}"),
+                (Some(b), None) => write!(f, "bestmove {b}"),
+                (None, Some(p)) => write!(f, "bestmove (none) ponder {p}"),
+                (None, None) => write!(f, "bestmove (none)"),
+            },
+            Self::CopyProtection(status) => write!(f, "copyprotection {status}"),
+            Self::Registration(status) => write!(f, "registration {status}"),
+            Self::Info(info) => write!(f, "info {info}"),
+            Self::Option(opt) => write!(f, "option {opt}"),
+        }
+    }
+}
+
+/// Represents the status of the `copyprotection` and `registration` commands.
+#[derive(Debug, Clone)]
+pub enum UciCheckingStatus {
+    /// The engine is checking the status of `copyprotection` or `registration`.
+    Checking,
+
+    /// All is well. Check was successful. No further action needed.
+    Ok,
+
+    /// An error occurred when checking `copyprotection` or `registration`
+    Error,
+}
+
+impl fmt::Display for UciCheckingStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Checking => write!(f, "checking"),
+            Self::Ok => write!(f, "ok"),
+            Self::Error => write!(f, "error"),
+        }
+    }
+}
+
+/// Bounds for the `score` argument of the `info` response.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum UciBound {
+    /// The score is just a lowerbound.
+    Lowerbound,
+
+    /// The score is just an upperbound.
+    Upperbound,
+}
+
+impl fmt::Display for UciBound {
+    /// Formats as either `upperbound` or `lowerbound`.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Lowerbound => write!(f, "lowerbound"),
+            Self::Upperbound => write!(f, "upperbound"),
+        }
+    }
+}
+
+/// Represents the type of score for the `score` argument of the `info` response.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum UciScoreType {
+    /// The score from the engine's point of view in centipawns.
+    Centipawns,
+
+    /// Mate in `<y>` moves (not plies).
+    Mate,
+}
+
+impl fmt::Display for UciScoreType {
+    /// Formats as either `cp` or `mate`.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Centipawns => write!(f, "cp"),
+            Self::Mate => write!(f, "mate"),
+        }
+    }
+}
+
+/// Represents
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct UciScore {
+    /// The score value, which is either a centipawn value or moves-to-mate,
+    /// depending on the value of `score_type`.
+    pub score: i32,
+
+    /// Either `cp` or `mate`.
+    pub score_type: UciScoreType,
+
+    /// Either `lowerbound` or `upperbound`.
+    pub bound: Option<UciBound>,
+}
+
+impl UciScore {
+    /// Construct a new [`UciScore`] with the provided `score`, `score_type`, and
+    /// `bound`.
+    pub const fn new(score: i32, score_type: UciScoreType, bound: Option<UciBound>) -> Self {
+        Self {
+            score,
+            score_type,
+            bound,
+        }
+    }
+
+    /// Construct a new [`UciScore`] with the provided `score` and `score_type`
+    pub const fn new_unbounded(score: i32, score_type: UciScoreType) -> Self {
+        Self::new(score, score_type, None)
+    }
+
+    /// Construct a new [`UciScore`] with `score_type` [`UciScoreType::Centipawns`].
+    pub const fn cp(score: i32) -> Self {
+        Self::new_unbounded(score, UciScoreType::Centipawns)
+    }
+
+    /// Construct a new [`UciScore`] with `score_type` [`UciScoreType::Mate`].
+    pub const fn mate(moves_to_mate: i32) -> Self {
+        Self::new_unbounded(moves_to_mate, UciScoreType::Mate)
+    }
+
+    /// Consumes `self` and appends the provided [`UciBound`] onto `self`.
+    pub const fn with_bound(mut self, bound: UciBound) -> Self {
+        self.bound = Some(bound);
+        self
+    }
+}
+
+impl fmt::Display for UciScore {
+    /// Formats as `<cp <x> | mate <y>> [lowerbound | upperbound]`
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(bound) = &self.bound {
+            write!(f, "{} {} {bound}", self.score_type, self.score)
+        } else {
+            write!(f, "{} {}", self.score_type, self.score)
+        }
+    }
+}
+
+/// Represents all information that can be sent with the `info` command.
+#[derive(Debug, Clone, Default)]
+pub struct UciInfo {
+    /// ```text
+    /// depth <x>
+    /// ```
+    /// Search depth (in plies).
+    pub depth: Option<String>,
+
+    /// ```text
+    /// seldepth <x>
+    /// ```
+    /// Selective search depth (in plies),
+    ///
+    /// If the engine sends `seldepth` there must also be a `depth` present in the
+    /// same string.
+    pub seldepth: Option<String>,
+
+    /// ```text
+    /// time <x>
+    /// ```
+    /// The time searched (in ms).
+    /// This should be sent together with the `pv`.
+    pub time: Option<String>,
+
+    /// ```text
+    /// nodes <x>
+    /// ```
+    /// `<x>` nodes searched.
+    /// The engine should send this info regularly.
+    pub nodes: Option<String>,
+
+    /// ```text
+    /// pv <move_1> [<move_2> ... <move_i>]
+    /// ```
+    /// The best line found.
+    pub pv: Vec<String>,
+
+    /// ```text
+    /// multipv <num>
+    /// ```
+    /// This for the multi pv mode.
+    ///
+    /// For the best move/pv add `multipv 1` in the string when you send the pv.
+    ///
+    /// In *k*-best mode always send all k variants in k strings together.
+    pub multipv: Option<String>,
+
+    /// ```text
+    /// score [cp <x> | mate <y> | lowerbound | upperbound]
+    /// ```
+    ///
+    ///   - `cp <x>` - The score from the engine's point of view in centipawns.
+    ///   - `mate <y>` - Mate in `y` moves, not plies.
+    ///
+    /// If the engine is getting mated, use negative values for `y`.
+    ///
+    ///   - `lowerbound` - The score is just a lower bound.
+    ///   - `upperbound` - The score is just an upper bound.
+    pub score: Option<UciScore>,
+
+    /// ```text
+    /// currmove <move>
+    /// ```
+    /// Currently searching this move
+    pub currmove: Option<String>,
+
+    /// ```text
+    /// Currmovenumber <x>
+    /// ```
+    /// Currently searching move number `x`, for the first move `x` should be `1` not
+    /// `0`.
+    pub currmovenumber: Option<String>,
+
+    /// ```text
+    /// hashfull <x>
+    /// ```
+    /// The hash is `x` permill full.
+    ///
+    /// The engine should send this info regularly.
+    pub hashfull: Option<String>,
+
+    /// ```text
+    /// nps <x>
+    /// ```
+    /// `x` nodes per second searched.
+    ///
+    /// The engine should send this info regularly.
+    pub nps: Option<String>,
+
+    /// ```text
+    /// tbhits <x>
+    /// ```
+    /// `x` positions where found in the endgame table bases.
+    pub tbhits: Option<String>,
+
+    /// ```text
+    /// sbhits <x>
+    /// ```
+    /// `x` positions where found in the shredder endgame databases.
+    pub sbhits: Option<String>,
+
+    /// ```text
+    /// cpuload x
+    /// ```
+    /// The cpu usage of the engine is `x` permill.
+    pub cpuload: Option<String>,
+
+    /// ```text
+    /// string <str>
+    /// ```
+    /// Any string `str` which will be displayed be the engine.
+    ///
+    /// If there is a string command the rest of the line will be interpreted as
+    /// `str`.
+    pub string: Option<String>,
+
+    /// ```text
+    /// refutation <move_1> <move_2> ... <move_i>
+    /// ```
+    /// Move `<move_1>` is refuted by the line `<move_2> ... <move_1>`.
+    /// `i` can be any number `>= 1`.
+    ///
+    /// Example: after move `d1h5` is searched, the engine can send
+    /// `info refutation d1h5 g6h5` if `g6h5` is the best answer after
+    /// `d1h5` or if `g6h5` refutes the move `d1h5`.
+    ///
+    /// If there is no refutation for `d1h5` found, the engine should just send
+    /// `info refutation d1h5`.
+    ///
+    /// The engine should only send this if the option `UCI_ShowRefutations` is set
+    /// to `true`.
+    pub refutation: Vec<String>,
+
+    /// ```text
+    /// currline <cpnunr> <move_1> [<move_2> ... <move_i>]
+    /// ```
+    /// This is the current line the engine is calculating. `cpunr` is the number of
+    /// the cpu if the engine is running on more than one cpu. `cpunr = 1,2,3...`.
+    ///
+    /// if the engine is just using one cpu, `cpunr` can be omitted.
+    ///
+    /// If `cpunr` is greater than `1`, always send all *k* lines in *k* strings
+    /// together.
+    ///
+    /// The engine should only send this if the option `UCI_ShowCurrLine` is set to
+    /// `true`.
+    pub currline: Vec<String>,
+}
+
+impl UciInfo {
+    /// Creates a new, empty, [`UciInfo`] struct.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Consumes `self` and adds the provided `depth` value.
+    pub fn depth(mut self, depth: impl fmt::Display) -> Self {
+        self.depth = Some(depth.to_string());
+        self
+    }
+
+    /// Consumes `self` and adds the provided `seldepth` value.
+    pub fn seldepth(mut self, seldepth: impl fmt::Display) -> Self {
+        self.seldepth = Some(seldepth.to_string());
+        self
+    }
+
+    /// Consumes `self` and adds the provided `time` value.
+    pub fn time(mut self, time: impl fmt::Display) -> Self {
+        self.time = Some(time.to_string());
+        self
+    }
+
+    /// Consumes `self` and adds the provided `nodes` value.
+    pub fn nodes(mut self, nodes: impl fmt::Display) -> Self {
+        self.nodes = Some(nodes.to_string());
+        self
+    }
+
+    /// Consumes `self` and adds the provided `multipv` value.
+    pub fn multipv(mut self, multipv: impl fmt::Display) -> Self {
+        self.multipv = Some(multipv.to_string());
+        self
+    }
+
+    /// Consumes `self` and adds the provided `score` value.
+    pub fn score(mut self, score: impl Into<UciScore>) -> Self {
+        self.score = Some(score.into());
+        self
+    }
+
+    /// Consumes `self` and adds the provided `currmove` value.
+    pub fn currmove(mut self, currmove: impl fmt::Display) -> Self {
+        self.currmove = Some(currmove.to_string());
+        self
+    }
+
+    /// Consumes `self` and adds the provided `currmovenumber` value.
+    pub fn currmovenumber(mut self, currmovenumber: impl fmt::Display) -> Self {
+        self.currmovenumber = Some(currmovenumber.to_string());
+        self
+    }
+
+    /// Consumes `self` and adds the provided `hashfull` value.
+    pub fn hashfull(mut self, hashfull: impl fmt::Display) -> Self {
+        self.hashfull = Some(hashfull.to_string());
+        self
+    }
+
+    /// Consumes `self` and adds the provided `nps` value.
+    pub fn nps(mut self, nps: impl fmt::Display) -> Self {
+        self.nps = Some(nps.to_string());
+        self
+    }
+
+    /// Consumes `self` and adds the provided `tbhits` value.
+    pub fn tbhits(mut self, tbhits: impl fmt::Display) -> Self {
+        self.tbhits = Some(tbhits.to_string());
+        self
+    }
+
+    /// Consumes `self` and adds the provided `sbhits` value.
+    pub fn sbhits(mut self, sbhits: impl fmt::Display) -> Self {
+        self.sbhits = Some(sbhits.to_string());
+        self
+    }
+
+    /// Consumes `self` and adds the provided `cpuload` value.
+    pub fn cpuload(mut self, cpuload: impl fmt::Display) -> Self {
+        self.cpuload = Some(cpuload.to_string());
+        self
+    }
+
+    /// Consumes `self` and adds the provided `string` value.
+    pub fn string(mut self, string: impl fmt::Display) -> Self {
+        self.string = Some(string.to_string());
+        self
+    }
+
+    /// Consumes `self` and adds the provided `pv` value.
+    pub fn pv<T: fmt::Display>(mut self, pv: impl IntoIterator<Item = T>) -> Self {
+        self.pv = pv.into_iter().map(|x| x.to_string()).collect();
+        self
+    }
+
+    /// Consumes `self` and adds the provided `refutation` value.
+    pub fn refutation<T: fmt::Display>(mut self, refutation: impl IntoIterator<Item = T>) -> Self {
+        self.refutation = refutation.into_iter().map(|x| x.to_string()).collect();
+        self
+    }
+
+    /// Consumes `self` and adds the provided `currline` value.
+    pub fn currline<T: fmt::Display>(mut self, currline: impl IntoIterator<Item = T>) -> Self {
+        self.currline = currline.into_iter().map(|x| x.to_string()).collect();
+        self
+    }
+}
+
+impl fmt::Display for UciInfo {
+    /// An info command will only display data that it has.
+    ///
+    /// Any `None` fields are not displayed.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(x) = &self.depth {
+            write!(f, "depth {x} ")?;
+        }
+        if let Some(x) = &self.seldepth {
+            write!(f, "seldepth {x} ")?
+        }
+        if let Some(x) = &self.time {
+            write!(f, "time {x} ")?;
+        }
+        if let Some(x) = &self.nodes {
+            write!(f, "nodes {x} ")?;
+        }
+        if let Some(x) = &self.multipv {
+            write!(f, "multipv {x} ")?;
+        }
+        if let Some(x) = &self.score {
+            write!(f, "score {x} ")?;
+        }
+        if let Some(x) = &self.currmove {
+            write!(f, "currmove {x} ")?;
+        }
+        if let Some(x) = &self.currmovenumber {
+            write!(f, "currmovenumber {x} ")?;
+        }
+        if let Some(x) = &self.hashfull {
+            write!(f, "hashfull {x} ")?;
+        }
+        if let Some(x) = &self.nps {
+            write!(f, "nps {x} ")?;
+        }
+        if let Some(x) = &self.tbhits {
+            write!(f, "tbhits {x} ")?;
+        }
+        if let Some(x) = &self.sbhits {
+            write!(f, "sbhits {x} ")?;
+        }
+        if let Some(x) = &self.cpuload {
+            write!(f, "cpuload {x} ")?;
+        }
+        if let Some(x) = &self.string {
+            write!(f, "string {x} ")?;
+        }
+        if !self.refutation.is_empty() {
+            write!(f, "refutation {}", self.refutation.join(" "))?;
+        }
+        if !self.currline.is_empty() {
+            write!(f, "currline {}", self.currline.join(" "))?;
+        }
+        if !self.pv.is_empty() {
+            write!(f, "pv {}", self.pv.join(" "))?;
+        }
+        Ok(())
+    }
+}
+
+/// Represents a UCI-compatible option that can be modified for your Engine.
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
+pub struct UciOption<T = String> {
+    /// Name of the option.
+    pub name: T,
+
+    /// What type of option it is.
+    pub opt_type: UciOptionType<T>,
+}
+
+impl<T: fmt::Display> UciOption<T> {
+    /// Create a new [`UciOption`] with the provided name and type.
+    pub const fn new(name: T, opt_type: UciOptionType<T>) -> Self {
+        Self { name, opt_type }
+    }
+
+    /// Create a new [`UciOption`] of type [`UciOptionType::Check`].
+    pub const fn check(name: T, default: bool) -> Self {
+        Self::new(name, UciOptionType::Check { default })
+    }
+
+    /// Create a new [`UciOption`] of type [`UciOptionType::Spin`].
+    pub const fn spin(name: T, default: i32, min: i32, max: i32) -> Self {
+        Self::new(name, UciOptionType::Spin { default, min, max })
+    }
+
+    /// Create a new [`UciOption`] of type [`UciOptionType::Combo`].
+    pub fn combo(name: T, default: T, vars: impl IntoIterator<Item = T>) -> Self {
+        Self::new(
+            name,
+            UciOptionType::Combo {
+                default,
+                vars: vars.into_iter().collect(),
+            },
+        )
+    }
+
+    /// Create a new [`UciOption`] of type [`UciOptionType::Button`].
+    pub const fn button(name: T) -> Self {
+        Self::new(name, UciOptionType::Button)
+    }
+
+    /// Create a new [`UciOption`] of type [`UciOptionType::String`].
+    pub const fn string(name: T, default: T) -> Self {
+        Self::new(name, UciOptionType::String { default })
+    }
+}
+
+impl<T: fmt::Display> fmt::Display for UciOption<T> {
+    /// An option is displayed as `name <name> type <type>`.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "name {} type {}", self.name, self.opt_type)
+    }
+}
+
+/// Represents the type of UCI-compatible options your engine can expose to the GUI.
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
+pub enum UciOptionType<T = String> {
+    ///```text
+    /// check
+    /// ```
+    /// A checkbox that can either be `true` or `false`.
+    Check { default: bool },
+
+    ///```text
+    /// spin
+    /// ```
+    /// A spin wheel that can be an integer in a certain range.
+    Spin { default: i32, min: i32, max: i32 },
+
+    ///```text
+    /// combo
+    /// ```
+    /// A combo box that can have different predefined strings as a value.
+    Combo { default: T, vars: Vec<T> },
+
+    ///```text
+    /// button
+    /// ```
+    /// A button that can be pressed to send a command to the engine.
+    Button,
+
+    ///```text
+    /// string
+    /// ```
+    /// A text field that has a string as a value
+    ///
+    /// An empty string has the value `<empty>`
+    String { default: T },
+}
+
+impl<T: fmt::Display> fmt::Display for UciOptionType<T> {
+    /// Option types are displayed like [these examples](https://backscattering.de/chess/uci/#engine-option-examples).
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            UciOptionType::Check { default } => write!(f, "check default {default}"),
+            UciOptionType::Spin { default, min, max } => {
+                write!(f, "spin default {default} min {min} max {max}")
+            }
+            UciOptionType::Combo { default, vars } => {
+                write!(f, "combo default {default}")?;
+                for var in vars {
+                    write!(f, " var {var}")?;
+                }
+                Ok(())
+            }
+            UciOptionType::Button => write!(f, "button"),
+            UciOptionType::String { default } => write!(f, "string default {default}"),
+        }
     }
 }
