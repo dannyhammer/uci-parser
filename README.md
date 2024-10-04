@@ -6,6 +6,53 @@ This crate contains types and functions for communicating with chess engines and
 
 The primary function of this crate is to provide well-typed representations for every message/command described in the UCI protocol, along with an easy-to-use API for converting between these well-typed representations and strings.
 
+## Examples
+
+The simplest use case is parsing commands like `uci`, which is as easy as it sounds:
+
+```rust
+use uci_parser::UciCommand;
+let cmd = UciCommand::new("uci").unwrap();
+assert_eq!(cmd, UciCommand::Uci);
+```
+
+Commands implement `FromStr`, so you can call `.parse()`:
+
+```rust
+use uci_parser::UciCommand;
+
+// Arbitrary whitespace is handled appropriately
+let cmd = "setoption    name \n    Threads value \t 16".parse::<UciCommand>();
+assert!(cmd.is_ok());
+
+assert_eq!(
+    cmd.unwrap(),
+    UciCommand::SetOption {
+        name: "Threads".to_string(),
+        value: Some("16".to_string())
+    }
+);
+```
+
+Commands that have many optional arguments, like `go`, implement `Default` so they can be parsed cleanly:
+
+```rust
+use std::time::Duration;
+use uci_parser::{UciCommand, UciSearchOptions};
+
+let cmd = "go movetime 42".parse::<UciCommand>();
+assert!(cmd.is_ok());
+
+assert_eq!(
+    cmd.unwrap(),
+    UciCommand::Go(UciSearchOptions {
+        // Times are provided as Durations
+        movetime: Some(Duration::from_millis(42)),
+        ..Default::default()
+    })
+);
+```
+
 ## Crate Features
 
 How edge cases should be handled is a delicate subject and the correct answer depends on the needs of your engine.

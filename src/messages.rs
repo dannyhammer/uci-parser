@@ -342,8 +342,6 @@ pub enum UciCommand {
 
 impl UciCommand {
     /// Attempt to parse `input` into a valid [`UciCommand`].
-    ///
-    /// If this function fails, `Err` will contain an error message as to why.
     #[inline(always)]
     pub fn new(input: &str) -> Result<Self, UciParseError> {
         parse_uci_command(input)

@@ -32,50 +32,45 @@ pub(crate) fn parse_uci_command(input: &str) -> Result<UciCommand, UciParseError
     let mut parser =
         nom::combinator::all_consuming(map(many_till(anychar, parse_command), |(_, cmd)| cmd));
 
-    // The `many_till(anychar)` part consumes any unknown characters until a command is parsed.
+    // The `many_till(anychar)` parser consumes any unknown characters until a command is parsed.
     #[cfg(not(feature = "err-on-unused-input"))]
     let mut parser = map(many_till(anychar, parse_command), |(_, cmd)| cmd);
 
     parser(input).map(|(_rest, cmd)| cmd).map_err(|e| match e {
-        Err::Error(_) => UciParseError::UnrecognizedCommand {
+        // A recoverable error means that the command was not recognized
+        Err::Error(_) | Err::Incomplete(_) => UciParseError::UnrecognizedCommand {
             cmd: input.to_string(),
         },
-        Err::Failure(e) => UciParseError::InvalidArguments {
-            args: e.input.to_string(),
-        },
-        _ => unreachable!("'Err::Incomplete' not possible"),
+
+        // A failure means that the command was recognized, but the argument(s) provided to it were invalid.
+        Err::Failure(e) => {
+            // Find the location of where this error originated
+            let place = input.rfind(e.input).unwrap_or_default();
+
+            // If the location of this error is NOT at the end of the input string, subtract 1 from it (to get rid of trailing whitespace)
+            let place = if place < input.len() {
+                place.checked_sub(1).unwrap_or_default()
+            } else {
+                place
+            };
+
+            // Get everything that was successfully parsed.
+            let cmd = input.get(..place).unwrap().to_string();
+
+            // Get everything that *wasn't* parsed.
+            let arg = e.input.to_string();
+
+            if arg.is_empty() {
+                UciParseError::InsufficientArguments { cmd }
+            } else {
+                UciParseError::InvalidArgument { cmd, arg }
+            }
+        }
     })
 }
 
-/*
-pub fn parse_with_usage<'a, F>(
-    input: &'a str,
-    mut parser: F,
-    usage: &'static str,
-) -> Result<UciCommand, UciParseError<'a>>
-where
-    F: FnMut(&'a str) -> IResult<&'a str, UciCommand>,
-{
-    match parser(input) {
-        Ok((_rest, cmd)) => Ok(cmd),
-        Err(err) => match err {
-            Err::Error(e) => {
-                eprintln!("Error while parsing {input:?}: {e}",);
-                Err(UciParseError::UnrecognizedCommand)
-            }
-            Err::Failure(e) => {
-                eprintln!("Failure while parsing {input:?}: {e}",);
-                Err(UciParseError::InvalidArguments { usage })
-            }
-
-            _ => unreachable!(),
-        },
-    }
-}
- */
-
 /// Parses a single-word [`UciCommand`] like `uci` or `isready`.
-fn single_word_command<'a>(
+fn single_command<'a>(
     ident: &'static str,
     cmd: UciCommand,
 ) -> impl FnMut(&'a str) -> IResult<&'a str, UciCommand> {
@@ -83,7 +78,7 @@ fn single_word_command<'a>(
 }
 
 /// Parses a multi-word [`UciCommand`] like `go` or `setoption`.
-fn multi_word_command<'a, F>(
+fn multi_command<'a, F>(
     ident: &'static str,
     parser: F,
 ) -> impl FnMut(&'a str) -> IResult<&'a str, UciCommand>
@@ -96,19 +91,19 @@ where
 /// Parses a single UCI command
 fn parse_command(input: &str) -> IResult<&str, UciCommand> {
     alt((
-        single_word_command("uci", UciCommand::Uci),
-        multi_word_command("debug", parse_debug_args),
-        single_word_command("isready", UciCommand::IsReady),
-        multi_word_command("setoption", parse_setoption_args),
-        multi_word_command("register", parse_register_args),
-        single_word_command("ucinewgame", UciCommand::UciNewGame),
-        multi_word_command("position", parse_position_args),
-        multi_word_command("go", parse_go_args),
-        single_word_command("stop", UciCommand::Stop),
-        single_word_command("ponderhit", UciCommand::PonderHit),
-        single_word_command("quit", UciCommand::Quit),
+        single_command("uci", UciCommand::Uci),
+        multi_command("debug", parse_debug_args),
+        single_command("isready", UciCommand::IsReady),
+        multi_command("setoption", parse_setoption_args),
+        multi_command("register", parse_register_args),
+        single_command("ucinewgame", UciCommand::UciNewGame),
+        multi_command("position", parse_position_args),
+        multi_command("go", parse_go_args),
+        single_command("stop", UciCommand::Stop),
+        single_command("ponderhit", UciCommand::PonderHit),
+        single_command("quit", UciCommand::Quit),
         #[cfg(feature = "parse-bench")]
-        multi_word_command("bench", parse_bench_args),
+        multi_command("bench", parse_bench_args),
     ))(input)
 }
 
