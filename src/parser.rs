@@ -13,10 +13,10 @@ use nom::{
     combinator::{cut, eof, map, map_res, opt, recognize, value, verify},
     multi::{many0_count, many1, many1_count, many_till},
     sequence::{delimited, pair, preceded},
-    IResult,
+    Err, IResult,
 };
 
-use crate::{UciCommand, UciSearchOptions};
+use crate::{UciCommand, UciParseError, UciSearchOptions};
 
 #[cfg(feature = "types")]
 use crate::{uci_move, UciMove};
@@ -26,38 +26,89 @@ use nom::{character::complete::one_of, sequence::tuple};
 
 /// Top-level parser to convert a string into a [`UciCommand`].
 ///
-/// This will return an error if the `input` is not completely consumed during parsing.
-///
 /// See also [`UciCommand::new`]
-pub fn parse_uci_command(input: &str) -> IResult<&str, UciCommand> {
+pub(crate) fn parse_uci_command(input: &str) -> Result<UciCommand, UciParseError> {
     #[cfg(feature = "err-on-unused-input")]
-    {
-        nom::combinator::all_consuming(map(many_till(anychar, parse_command), |(_, cmd)| cmd))(
-            input,
-        )
-    }
+    let mut parser =
+        nom::combinator::all_consuming(map(many_till(anychar, parse_command), |(_, cmd)| cmd));
 
+    // The `many_till(anychar)` part consumes any unknown characters until a command is parsed.
     #[cfg(not(feature = "err-on-unused-input"))]
-    map(many_till(anychar, parse_command), |(_, cmd)| cmd)(input)
+    let mut parser = map(many_till(anychar, parse_command), |(_, cmd)| cmd);
+
+    parser(input).map(|(_rest, cmd)| cmd).map_err(|e| match e {
+        Err::Error(_) => UciParseError::UnrecognizedCommand {
+            cmd: input.to_string(),
+        },
+        Err::Failure(e) => UciParseError::InvalidArguments {
+            args: e.input.to_string(),
+        },
+        _ => unreachable!("'Err::Incomplete' not possible"),
+    })
+}
+
+/*
+pub fn parse_with_usage<'a, F>(
+    input: &'a str,
+    mut parser: F,
+    usage: &'static str,
+) -> Result<UciCommand, UciParseError<'a>>
+where
+    F: FnMut(&'a str) -> IResult<&'a str, UciCommand>,
+{
+    match parser(input) {
+        Ok((_rest, cmd)) => Ok(cmd),
+        Err(err) => match err {
+            Err::Error(e) => {
+                eprintln!("Error while parsing {input:?}: {e}",);
+                Err(UciParseError::UnrecognizedCommand)
+            }
+            Err::Failure(e) => {
+                eprintln!("Failure while parsing {input:?}: {e}",);
+                Err(UciParseError::InvalidArguments { usage })
+            }
+
+            _ => unreachable!(),
+        },
+    }
+}
+ */
+
+/// Parses a single-word [`UciCommand`] like `uci` or `isready`.
+fn single_word_command<'a>(
+    ident: &'static str,
+    cmd: UciCommand,
+) -> impl FnMut(&'a str) -> IResult<&'a str, UciCommand> {
+    value(cmd, term(ident))
+}
+
+/// Parses a multi-word [`UciCommand`] like `go` or `setoption`.
+fn multi_word_command<'a, F>(
+    ident: &'static str,
+    parser: F,
+) -> impl FnMut(&'a str) -> IResult<&'a str, UciCommand>
+where
+    F: FnMut(&'a str) -> IResult<&'a str, UciCommand>,
+{
+    preceded(term(ident), cut(parser))
 }
 
 /// Parses a single UCI command
 fn parse_command(input: &str) -> IResult<&str, UciCommand> {
     alt((
-        value(UciCommand::Uci, term("uci")),
-        preceded(term("debug"), parse_debug_args),
-        value(UciCommand::IsReady, term("isready")),
-        preceded(term("setoption"), parse_setoption_args),
-        preceded(term("register"), parse_register_args),
-        value(UciCommand::UciNewGame, term("ucinewgame")),
-        preceded(term("position"), parse_position_args),
-        preceded(term("go"), parse_go_args),
-        value(UciCommand::Stop, term("stop")),
-        value(UciCommand::PonderHit, term("ponderhit")),
-        value(UciCommand::Quit, term("quit")),
+        single_word_command("uci", UciCommand::Uci),
+        multi_word_command("debug", parse_debug_args),
+        single_word_command("isready", UciCommand::IsReady),
+        multi_word_command("setoption", parse_setoption_args),
+        multi_word_command("register", parse_register_args),
+        single_word_command("ucinewgame", UciCommand::UciNewGame),
+        multi_word_command("position", parse_position_args),
+        multi_word_command("go", parse_go_args),
+        single_word_command("stop", UciCommand::Stop),
+        single_word_command("ponderhit", UciCommand::PonderHit),
+        single_word_command("quit", UciCommand::Quit),
         #[cfg(feature = "parse-bench")]
-        preceded(term("bench"), parse_bench_args),
-        // consumed(term),
+        multi_word_command("bench", parse_bench_args),
     ))(input)
 }
 
@@ -74,7 +125,7 @@ fn parse_debug_args(input: &str) -> IResult<&str, UciCommand> {
 
 /// Parses arguments to the `setoption` command.
 fn parse_setoption_args(input: &str) -> IResult<&str, UciCommand> {
-    let name = rest_after_until("name", "value");
+    let name = verify(rest_after_until("name", "value"), |s: &str| !s.is_empty());
     let value = rest_after("value");
 
     map(pair(name, opt(value)), |(name, value)| {
@@ -123,7 +174,6 @@ fn parse_position_args(input: &str) -> IResult<&str, UciCommand> {
         ),
     ));
 
-    // Optional list of moves
     let moves = map(opt(moves_after("moves")), Option::unwrap_or_default);
 
     map(pair(fen, moves), |(fen, moves)| UciCommand::Position {
@@ -213,7 +263,11 @@ fn rest_after<'a>(ident: &'a str) -> impl FnMut(&'a str) -> IResult<&'a str, &'a
 fn moves_after<'a>(ident: &'a str) -> impl FnMut(&'a str) -> IResult<&'a str, Vec<&'a str>> {
     preceded(
         term(ident),
-        many1(delimited(multispace0, recognize(uci_move), multispace0)),
+        cut(many1(delimited(
+            multispace0,
+            recognize(uci_move),
+            multispace0,
+        ))),
     )
 }
 
@@ -221,7 +275,7 @@ fn moves_after<'a>(ident: &'a str) -> impl FnMut(&'a str) -> IResult<&'a str, Ve
 fn moves_after<'a>(ident: &'a str) -> impl FnMut(&'a str) -> IResult<&'a str, Vec<UciMove>> {
     preceded(
         term(ident),
-        many1(delimited(multispace0, uci_move, multispace0)),
+        cut(many1(delimited(multispace0, uci_move, multispace0))),
     )
 }
 
@@ -231,6 +285,7 @@ fn moves_after<'a>(ident: &'a str) -> impl FnMut(&'a str) -> IResult<&'a str, Ve
 fn parse_fen(input: &str) -> IResult<&str, &str> {
     verify(rest_after_until("fen", "moves"), |s: &str| !s.is_empty())(input)
 }
+
 /// Parses and maps a base-10 number
 ///
 /// Negative numbers are handled by the `clamp-negatives` crate feature.
@@ -466,6 +521,8 @@ mod tests {
         new_err("setoption  name");
 
         new_err("setoption   name  value");
+
+        new_err("setoption   name  value    Risky");
 
         new_err("setoption   name  Clear Hash  value");
     }

@@ -6,11 +6,14 @@
 
 #![doc = include_str!("../README.md")]
 
-/// Utilities related to parsing UCI messages.
-mod parser;
+/// Error handling when parsing/building messages.
+pub mod error;
 
 /// Types representing the various GUI-to-Engine and Engine-to-GUI messages that can be sent.
 pub mod messages;
+
+/// Utilities related to parsing UCI messages.
+mod parser;
 
 /// Well-typed representations of pieces and moves.
 ///
@@ -25,7 +28,8 @@ pub mod messages;
 #[cfg(feature = "types")]
 pub mod types;
 
+pub use error::*;
 pub use messages::*;
-pub use parser::*;
+use parser::*;
 #[cfg(feature = "types")]
 pub use types::*;

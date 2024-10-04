@@ -6,7 +6,7 @@
 
 use std::{fmt, str::FromStr, time::Duration};
 
-use crate::parse_uci_command;
+use crate::{parse_uci_command, UciParseError};
 
 #[cfg(feature = "types")]
 use crate::UciMove;
@@ -344,16 +344,16 @@ impl UciCommand {
     /// Attempt to parse `input` into a valid [`UciCommand`].
     ///
     /// If this function fails, `Err` will contain an error message as to why.
-    pub fn new(input: &str) -> Result<Self, String> {
+    #[inline(always)]
+    pub fn new(input: &str) -> Result<Self, UciParseError> {
         parse_uci_command(input)
-            .map(|(_rest, cmd)| cmd)
-            .map_err(|e| e.to_string())
     }
 }
 
 impl FromStr for UciCommand {
-    type Err = String;
+    type Err = UciParseError;
     /// Alias for [`UciCommand::new`].
+    #[inline(always)]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::new(s)
     }
