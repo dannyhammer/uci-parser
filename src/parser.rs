@@ -120,7 +120,7 @@ fn parse_debug_args(input: &str) -> IResult<&str, UciCommand> {
 
 /// Parses arguments to the `setoption` command.
 fn parse_setoption_args(input: &str) -> IResult<&str, UciCommand> {
-    let name = verify(rest_after_until("name", "value"), |s: &str| !s.is_empty());
+    let name = between("name", "value");
     let value = rest_after("value");
 
     map(pair(name, opt(value)), |(name, value)| {
@@ -136,7 +136,7 @@ fn parse_register_args(input: &str) -> IResult<&str, UciCommand> {
     // Parses `later` as `(None, None)`
     let later = value((None, None), term("later"));
 
-    let name = rest_after_until("name", "code");
+    let name = between("name", "code");
     let code = rest_after("code");
 
     map(
@@ -237,13 +237,13 @@ fn rest_nonempty(input: &str) -> IResult<&str, &str> {
 /// A combinator that parses everything after `ident` until `end` is found, returning everything in between.
 ///
 /// This fails if there is no input between `ident` and `end` to consume.
-fn rest_after_until<'a>(
-    ident: &'a str,
-    end: &'a str,
-) -> impl FnMut(&'a str) -> IResult<&'a str, &'a str> {
+fn between<'a>(ident: &'a str, end: &'a str) -> impl FnMut(&'a str) -> IResult<&'a str, &'a str> {
     preceded(
         term(ident),
-        map(alt((take_until(end), rest_nonempty)), str::trim),
+        verify(
+            map(alt((take_until(end), rest_nonempty)), str::trim),
+            |s: &str| !s.is_empty(),
+        ),
     )
 }
 
@@ -278,7 +278,7 @@ fn moves_after<'a>(ident: &'a str) -> impl FnMut(&'a str) -> IResult<&'a str, Ve
 ///
 /// Fails if there is no non-whitespace input following `fen`.
 fn parse_fen(input: &str) -> IResult<&str, &str> {
-    verify(rest_after_until("fen", "moves"), |s: &str| !s.is_empty())(input)
+    between("fen", "moves")(input)
 }
 
 /// Parses and maps a base-10 number

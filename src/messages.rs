@@ -14,6 +14,8 @@ use crate::UciMove;
 /// A command sent from a GUI to an engine.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum UciCommand {
+    /// Check if the engine supports the UCI protocol.
+    ///
     /// # Command structure:
     /// ```text
     /// uci
@@ -34,6 +36,8 @@ pub enum UciCommand {
     /// killed by the GUI.
     Uci,
 
+    /// Enable/disable printing debug information.
+    ///
     /// # Command structure:
     /// ```text
     /// debug [on | off]
@@ -52,6 +56,8 @@ pub enum UciCommand {
     /// time, also when the engine is thinking.
     Debug(bool),
 
+    /// Synchronize with the engine.
+    ///
     /// # Command structure:
     /// ```text
     /// isready
@@ -74,6 +80,8 @@ pub enum UciCommand {
     /// immediately answer with `readyok` without stopping the search.
     IsReady,
 
+    /// Modify an option in the engine.
+    ///
     /// # Command structure:
     /// ```text
     /// setoption name <id> [value <x>]
@@ -107,6 +115,8 @@ pub enum UciCommand {
         value: Option<String>,
     },
 
+    /// Register with this engine.
+    ///
     /// # Command structure:
     /// ```text
     /// registration [name <name> code <code> | later]
@@ -139,6 +149,8 @@ pub enum UciCommand {
         code: Option<String>,
     },
 
+    /// Tell the engine that the following commands are to take place on a new game.
+    ///
     /// # Command structure:
     /// ```text
     /// ucinewgame
@@ -161,6 +173,8 @@ pub enum UciCommand {
     /// its operation.
     UciNewGame,
 
+    /// Set up the internal position for the engine.
+    ///
     /// # Command structure:
     /// ```text
     /// position [fen <string> | startpos] [moves <move_1> [<move_2> ...]]
@@ -192,6 +206,8 @@ pub enum UciCommand {
         moves: Vec<String>,
     },
 
+    /// Start a search on the engine.
+    ///
     /// # Command structure:
     /// ```text
     /// go [searchmoves <move_1> [<move_2> ...]] [ponder] [wtime <x>] [btime <x>] [winc <x>] [binc <x>] [movestogo <x>] [depth <x>] [nodes <x>] [mate <x>] [movetime <x>] [infinite]
@@ -289,6 +305,8 @@ pub enum UciCommand {
     /// so in this mode!
     Go(UciSearchOptions),
 
+    /// Tell the engine to stop searching.
+    ///
     /// # Command structure:
     /// ```text
     /// stop
@@ -302,6 +320,8 @@ pub enum UciCommand {
     /// the search.
     Stop,
 
+    /// Tell the engine that the opponent played the pondered move.
+    ///
     /// # Command structure:
     /// ```text
     /// ponderhit
@@ -314,6 +334,8 @@ pub enum UciCommand {
     /// continue searching but switch from pondering to normal search.
     PonderHit,
 
+    /// Tell the engine to quit as soon as possible.
+    ///
     /// # Command structure:
     /// ```text
     /// quit
@@ -330,6 +352,8 @@ pub enum UciCommand {
     /// Quit the program as soon as possible.
     Quit,
 
+    /// Run a benchmark suite.
+    ///
     /// ```text
     /// bench <x>
     /// ```
@@ -371,11 +395,7 @@ impl fmt::Display for UciCommand {
             Uci => write!(f, "uci"),
 
             Debug(status) => {
-                if *status {
-                    write!(f, "debug on")
-                } else {
-                    write!(f, "debug off")
-                }
+                write!(f, "debug {}", if *status { "on" } else { "off" })
             }
 
             IsReady => write!(f, "isready"),
@@ -423,7 +443,7 @@ impl fmt::Display for UciCommand {
             Quit => write!(f, "quit"),
 
             #[cfg(feature = "parse-bench")]
-            Bench(args) => write!(f, "bench{args}"), // As above, the lack of space here is intentional
+            Bench(args) => write!(f, "bench{args}"), // As with `go`, the lack of space here is intentional
         }
     }
 }
@@ -1130,7 +1150,7 @@ pub struct UciOption<T = String> {
     pub opt_type: UciOptionType<T>,
 }
 
-impl<T: fmt::Display> UciOption<T> {
+impl<T> UciOption<T> {
     /// Create a new [`UciOption`] with the provided name and type.
     pub const fn new(name: T, opt_type: UciOptionType<T>) -> Self {
         Self { name, opt_type }
