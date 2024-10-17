@@ -12,7 +12,7 @@ use crate::{parse_uci_command, UciParseError};
 use crate::UciMove;
 
 /// A command sent from a GUI to an engine.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum UciCommand {
     /// Check if the engine supports the UCI protocol.
     ///
@@ -629,7 +629,7 @@ impl fmt::Display for UciSearchOptions {
 /// # Responses sent from the Engine to the GUI via `stdout`.
 ///
 /// These are all the commands the interface gets from the engine.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum UciResponse<T = String> {
     /// ```text
     /// id name <x>
@@ -679,6 +679,21 @@ pub enum UciResponse<T = String> {
     Option(UciOption<T>),
 }
 
+impl UciResponse {
+    /// Convenience wrapper for creating a [`UciResponse::Info`] variant.
+    pub fn info(info: impl Into<UciInfo>) -> Self {
+        Self::Info(Box::new(info.into()))
+    }
+}
+
+impl<T: fmt::Display> UciResponse<T> {
+    /// Convenience wrapper for creating a [`UciResponse::Info`] variant that will display as `info string <s>`.
+    pub fn info_string(s: T) -> Self {
+        let info = UciInfo::new().string(s);
+        Self::Info(Box::new(info))
+    }
+}
+
 impl<T: fmt::Display> fmt::Display for UciResponse<T> {
     /// Responses are formatted to display appropriately according to the UCI specifications.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -701,7 +716,7 @@ impl<T: fmt::Display> fmt::Display for UciResponse<T> {
 }
 
 /// Represents the status of the `copyprotection` and `registration` commands.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum UciCheckingStatus {
     /// The engine is checking the status of `copyprotection` or `registration`.
     Checking,
@@ -724,7 +739,7 @@ impl fmt::Display for UciCheckingStatus {
 }
 
 /// Bounds for the `score` argument of the `info` response.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum UciBound {
     /// The score is just a lowerbound.
     Lowerbound,
@@ -744,7 +759,7 @@ impl fmt::Display for UciBound {
 }
 
 /// Represents the type of score for the `score` argument of the `info` response.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum UciScoreType {
     /// The score from the engine's point of view in centipawns.
     Centipawns,
@@ -764,7 +779,7 @@ impl fmt::Display for UciScoreType {
 }
 
 /// Represents
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UciScore {
     /// The score value, which is either a centipawn value or moves-to-mate,
     /// depending on the value of `score_type`.
@@ -822,7 +837,7 @@ impl fmt::Display for UciScore {
 }
 
 /// Represents all information that can be sent with the `info` command.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct UciInfo {
     /// ```text
     /// depth <x>
