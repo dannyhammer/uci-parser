@@ -709,7 +709,7 @@ impl<T: fmt::Display> fmt::Display for UciResponse<T> {
             },
             Self::CopyProtection(status) => write!(f, "copyprotection {status}"),
             Self::Registration(status) => write!(f, "registration {status}"),
-            Self::Info(info) => write!(f, "info {info}"),
+            Self::Info(info) => write!(f, "info{info}"), // Lack of space here is intentional
             Self::Option(opt) => write!(f, "option {opt}"),
         }
     }
@@ -1101,55 +1101,55 @@ impl fmt::Display for UciInfo {
     /// Any `None` fields are not displayed.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(x) = &self.depth {
-            write!(f, "depth {x} ")?;
+            write!(f, " depth {x}")?;
         }
         if let Some(x) = &self.seldepth {
-            write!(f, "seldepth {x} ")?
+            write!(f, " seldepth {x}")?
         }
         if let Some(x) = &self.time {
-            write!(f, "time {x} ")?;
+            write!(f, " time {x}")?;
         }
         if let Some(x) = &self.nodes {
-            write!(f, "nodes {x} ")?;
+            write!(f, " nodes {x}")?;
         }
         if let Some(x) = &self.multipv {
-            write!(f, "multipv {x} ")?;
+            write!(f, " multipv {x}")?;
         }
         if let Some(x) = &self.score {
-            write!(f, "score {x} ")?;
+            write!(f, " score {x}")?;
         }
         if let Some(x) = &self.currmove {
-            write!(f, "currmove {x} ")?;
+            write!(f, " currmove {x}")?;
         }
         if let Some(x) = &self.currmovenumber {
-            write!(f, "currmovenumber {x} ")?;
+            write!(f, " currmovenumber {x}")?;
         }
         if let Some(x) = &self.hashfull {
-            write!(f, "hashfull {x} ")?;
+            write!(f, " hashfull {x}")?;
         }
         if let Some(x) = &self.nps {
-            write!(f, "nps {x} ")?;
+            write!(f, " nps {x}")?;
         }
         if let Some(x) = &self.tbhits {
-            write!(f, "tbhits {x} ")?;
+            write!(f, " tbhits {x}")?;
         }
         if let Some(x) = &self.sbhits {
-            write!(f, "sbhits {x} ")?;
+            write!(f, " sbhits {x}")?;
         }
         if let Some(x) = &self.cpuload {
-            write!(f, "cpuload {x} ")?;
+            write!(f, " cpuload {x}")?;
         }
         if let Some(x) = &self.string {
-            write!(f, "string {x} ")?;
+            write!(f, " string {x}")?;
         }
         if !self.refutation.is_empty() {
-            write!(f, "refutation {}", self.refutation.join(" "))?;
+            write!(f, " refutation {}", self.refutation.join(" "))?;
         }
         if !self.currline.is_empty() {
-            write!(f, "currline {}", self.currline.join(" "))?;
+            write!(f, " currline {}", self.currline.join(" "))?;
         }
         if !self.pv.is_empty() {
-            write!(f, "pv {}", self.pv.join(" "))?;
+            write!(f, " pv {}", self.pv.join(" "))?;
         }
         Ok(())
     }
@@ -1157,49 +1157,78 @@ impl fmt::Display for UciInfo {
 
 /// Represents a UCI-compatible option that can be modified for your Engine.
 #[derive(Clone, PartialEq, Eq, Debug, Hash)]
-pub struct UciOption<T = String> {
+pub struct UciOption<T = String, INT = i32> {
     /// Name of the option.
     pub name: T,
 
     /// What type of option it is.
-    pub opt_type: UciOptionType<T>,
+    pub opt_type: UciOptionType<INT>,
 }
 
-impl<T> UciOption<T> {
+impl<T, INT> UciOption<T, INT> {
     /// Create a new [`UciOption`] with the provided name and type.
-    pub const fn new(name: T, opt_type: UciOptionType<T>) -> Self {
-        Self { name, opt_type }
+    pub fn new(name: impl Into<T>, opt_type: UciOptionType<INT>) -> Self {
+        Self {
+            name: name.into(),
+            opt_type,
+        }
     }
 
     /// Create a new [`UciOption`] of type [`UciOptionType::Check`].
-    pub const fn check(name: T, default: bool) -> Self {
-        Self::new(name, UciOptionType::Check { default })
+    pub fn check(name: impl Into<T>, default: impl Into<bool>) -> Self {
+        Self::new(
+            name,
+            UciOptionType::Check {
+                default: default.into(),
+            },
+        )
     }
 
     /// Create a new [`UciOption`] of type [`UciOptionType::Spin`].
-    pub const fn spin(name: T, default: i32, min: i32, max: i32) -> Self {
-        Self::new(name, UciOptionType::Spin { default, min, max })
+    pub fn spin(
+        name: impl Into<T>,
+        default: impl Into<INT>,
+        min: impl Into<INT>,
+        max: impl Into<INT>,
+    ) -> Self {
+        Self::new(
+            name,
+            UciOptionType::Spin {
+                default: default.into(),
+                min: min.into(),
+                max: max.into(),
+            },
+        )
     }
 
     /// Create a new [`UciOption`] of type [`UciOptionType::Combo`].
-    pub fn combo(name: T, default: T, vars: impl IntoIterator<Item = T>) -> Self {
+    pub fn combo<S: fmt::Display>(
+        name: impl Into<T>,
+        default: S,
+        vars: impl IntoIterator<Item = S>,
+    ) -> Self {
         Self::new(
             name,
             UciOptionType::Combo {
-                default,
-                vars: vars.into_iter().collect(),
+                default: default.to_string(),
+                vars: vars.into_iter().map(|s| s.to_string()).collect(),
             },
         )
     }
 
     /// Create a new [`UciOption`] of type [`UciOptionType::Button`].
-    pub const fn button(name: T) -> Self {
+    pub fn button(name: impl Into<T>) -> Self {
         Self::new(name, UciOptionType::Button)
     }
 
     /// Create a new [`UciOption`] of type [`UciOptionType::String`].
-    pub const fn string(name: T, default: T) -> Self {
-        Self::new(name, UciOptionType::String { default })
+    pub fn string(name: impl Into<T>, default: impl fmt::Display) -> Self {
+        Self::new(
+            name,
+            UciOptionType::String {
+                default: default.to_string(),
+            },
+        )
     }
 }
 
@@ -1212,7 +1241,7 @@ impl<T: fmt::Display> fmt::Display for UciOption<T> {
 
 /// Represents the type of UCI-compatible options your engine can expose to the GUI.
 #[derive(Clone, PartialEq, Eq, Debug, Hash)]
-pub enum UciOptionType<T = String> {
+pub enum UciOptionType<INT = i32> {
     ///```text
     /// check
     /// ```
@@ -1223,13 +1252,13 @@ pub enum UciOptionType<T = String> {
     /// spin
     /// ```
     /// A spin wheel that can be an integer in a certain range.
-    Spin { default: i32, min: i32, max: i32 },
+    Spin { default: INT, min: INT, max: INT },
 
     ///```text
     /// combo
     /// ```
     /// A combo box that can have different predefined strings as a value.
-    Combo { default: T, vars: Vec<T> },
+    Combo { default: String, vars: Vec<String> },
 
     ///```text
     /// button
@@ -1243,7 +1272,7 @@ pub enum UciOptionType<T = String> {
     /// A text field that has a string as a value
     ///
     /// An empty string has the value `<empty>`
-    String { default: T },
+    String { default: String },
 }
 
 impl<T: fmt::Display> fmt::Display for UciOptionType<T> {
@@ -1251,9 +1280,11 @@ impl<T: fmt::Display> fmt::Display for UciOptionType<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             UciOptionType::Check { default } => write!(f, "check default {default}"),
+
             UciOptionType::Spin { default, min, max } => {
                 write!(f, "spin default {default} min {min} max {max}")
             }
+
             UciOptionType::Combo { default, vars } => {
                 write!(f, "combo default {default}")?;
                 for var in vars {
@@ -1261,7 +1292,9 @@ impl<T: fmt::Display> fmt::Display for UciOptionType<T> {
                 }
                 Ok(())
             }
+
             UciOptionType::Button => write!(f, "button"),
+
             UciOptionType::String { default } => write!(f, "string default {default}"),
         }
     }
