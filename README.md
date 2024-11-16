@@ -53,6 +53,30 @@ assert_eq!(
 );
 ```
 
+Engine-to-GUI responses can also be created and printed easily:
+
+```rust
+use uci_parser::UciResponse;
+let resp = UciResponse::BestMove {
+    bestmove: Some("e2e4"),
+    ponder: Some("c7c5")
+};
+
+assert_eq!(resp.to_string(), "bestmove e2e4 ponder c7c5");
+```
+
+More complex responses, such as `info`, have helper functions:
+
+```rust
+use uci_parser::{UciResponse, UciInfo, UciScore};
+let score = UciScore::cp(42);
+let info = UciInfo::new().nodes(440).depth(2).score(score);
+let resp = UciResponse::info(info);
+
+// `info` params are displayed in the same order every time.
+assert_eq!(resp.to_string(), "info depth 2 nodes 440 score cp 42");
+```
+
 ## Crate Features
 
 How edge cases should be handled is a delicate subject and the correct answer depends on the needs of your engine.
@@ -88,3 +112,11 @@ Rather than enforce my own opinion on handling those edge cases, I've marked the
 -   `types`: Exposes several well-typed representations of UCI components, such as moves.
     -   By default, commands like `position startpos moves e2e4` will yield a list of `String`s for all parsed `moves`, leaving you to have to re-parse them in your engine later. If this feature is enabled, any `String` that is parsed as a move will be converted to [`UciMove`], which contains types representing the files, ranks, squares, and pieces involved in each move.
     -   See the [`types`] module for more information.
+
+```
+
+```
+
+```
+
+```

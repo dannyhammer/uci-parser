@@ -681,6 +681,8 @@ pub enum UciResponse<T = String> {
 
 impl UciResponse {
     /// Convenience wrapper for creating a [`UciResponse::Info`] variant.
+    #[must_use]
+    #[inline(always)]
     pub fn info(info: impl Into<UciInfo>) -> Self {
         Self::Info(Box::new(info.into()))
     }
@@ -688,6 +690,8 @@ impl UciResponse {
 
 impl<T: fmt::Display> UciResponse<T> {
     /// Convenience wrapper for creating a [`UciResponse::Info`] variant that will display as `info string <s>`.
+    #[must_use]
+    #[inline(always)]
     pub fn info_string(s: T) -> Self {
         let info = UciInfo::new().string(s);
         Self::Info(Box::new(info))
@@ -795,6 +799,8 @@ pub struct UciScore {
 impl UciScore {
     /// Construct a new [`UciScore`] with the provided `score`, `score_type`, and
     /// `bound`.
+    #[must_use]
+    #[inline(always)]
     pub const fn new(score: i32, score_type: UciScoreType, bound: Option<UciBound>) -> Self {
         Self {
             score,
@@ -804,21 +810,29 @@ impl UciScore {
     }
 
     /// Construct a new [`UciScore`] with the provided `score` and `score_type`
+    #[must_use]
+    #[inline(always)]
     pub const fn new_unbounded(score: i32, score_type: UciScoreType) -> Self {
         Self::new(score, score_type, None)
     }
 
     /// Construct a new [`UciScore`] with `score_type` [`UciScoreType::Centipawns`].
+    #[must_use]
+    #[inline(always)]
     pub const fn cp(score: i32) -> Self {
         Self::new_unbounded(score, UciScoreType::Centipawns)
     }
 
     /// Construct a new [`UciScore`] with `score_type` [`UciScoreType::Mate`].
+    #[must_use]
+    #[inline(always)]
     pub const fn mate(moves_to_mate: i32) -> Self {
         Self::new_unbounded(moves_to_mate, UciScoreType::Mate)
     }
 
     /// Consumes `self` and appends the provided [`UciBound`] onto `self`.
+    #[must_use]
+    #[inline(always)]
     pub const fn with_bound(mut self, bound: UciBound) -> Self {
         self.bound = Some(bound);
         self
@@ -988,107 +1002,143 @@ pub struct UciInfo {
 
 impl UciInfo {
     /// Creates a new, empty, [`UciInfo`] struct.
+    #[must_use]
+    #[inline(always)]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Consumes `self` and adds the provided `depth` value.
+    #[must_use]
+    #[inline(always)]
     pub fn depth(mut self, depth: impl fmt::Display) -> Self {
         self.depth = Some(depth.to_string());
         self
     }
 
     /// Consumes `self` and adds the provided `seldepth` value.
+    #[must_use]
+    #[inline(always)]
     pub fn seldepth(mut self, seldepth: impl fmt::Display) -> Self {
         self.seldepth = Some(seldepth.to_string());
         self
     }
 
     /// Consumes `self` and adds the provided `time` value.
+    #[must_use]
+    #[inline(always)]
     pub fn time(mut self, time: impl fmt::Display) -> Self {
         self.time = Some(time.to_string());
         self
     }
 
     /// Consumes `self` and adds the provided `nodes` value.
+    #[must_use]
+    #[inline(always)]
     pub fn nodes(mut self, nodes: impl fmt::Display) -> Self {
         self.nodes = Some(nodes.to_string());
         self
     }
 
     /// Consumes `self` and adds the provided `multipv` value.
+    #[must_use]
+    #[inline(always)]
     pub fn multipv(mut self, multipv: impl fmt::Display) -> Self {
         self.multipv = Some(multipv.to_string());
         self
     }
 
     /// Consumes `self` and adds the provided `score` value.
+    #[must_use]
+    #[inline(always)]
     pub fn score(mut self, score: impl Into<UciScore>) -> Self {
         self.score = Some(score.into());
         self
     }
 
     /// Consumes `self` and adds the provided `currmove` value.
+    #[must_use]
+    #[inline(always)]
     pub fn currmove(mut self, currmove: impl fmt::Display) -> Self {
         self.currmove = Some(currmove.to_string());
         self
     }
 
     /// Consumes `self` and adds the provided `currmovenumber` value.
+    #[must_use]
+    #[inline(always)]
     pub fn currmovenumber(mut self, currmovenumber: impl fmt::Display) -> Self {
         self.currmovenumber = Some(currmovenumber.to_string());
         self
     }
 
     /// Consumes `self` and adds the provided `hashfull` value.
+    #[must_use]
+    #[inline(always)]
     pub fn hashfull(mut self, hashfull: impl fmt::Display) -> Self {
         self.hashfull = Some(hashfull.to_string());
         self
     }
 
     /// Consumes `self` and adds the provided `nps` value.
+    #[must_use]
+    #[inline(always)]
     pub fn nps(mut self, nps: impl fmt::Display) -> Self {
         self.nps = Some(nps.to_string());
         self
     }
 
     /// Consumes `self` and adds the provided `tbhits` value.
+    #[must_use]
+    #[inline(always)]
     pub fn tbhits(mut self, tbhits: impl fmt::Display) -> Self {
         self.tbhits = Some(tbhits.to_string());
         self
     }
 
     /// Consumes `self` and adds the provided `sbhits` value.
+    #[must_use]
+    #[inline(always)]
     pub fn sbhits(mut self, sbhits: impl fmt::Display) -> Self {
         self.sbhits = Some(sbhits.to_string());
         self
     }
 
     /// Consumes `self` and adds the provided `cpuload` value.
+    #[must_use]
+    #[inline(always)]
     pub fn cpuload(mut self, cpuload: impl fmt::Display) -> Self {
         self.cpuload = Some(cpuload.to_string());
         self
     }
 
     /// Consumes `self` and adds the provided `string` value.
+    #[must_use]
+    #[inline(always)]
     pub fn string(mut self, string: impl fmt::Display) -> Self {
         self.string = Some(string.to_string());
         self
     }
 
     /// Consumes `self` and adds the provided `pv` value.
+    #[must_use]
+    #[inline(always)]
     pub fn pv<T: fmt::Display>(mut self, pv: impl IntoIterator<Item = T>) -> Self {
         self.pv = pv.into_iter().map(|x| x.to_string()).collect();
         self
     }
 
     /// Consumes `self` and adds the provided `refutation` value.
+    #[must_use]
+    #[inline(always)]
     pub fn refutation<T: fmt::Display>(mut self, refutation: impl IntoIterator<Item = T>) -> Self {
         self.refutation = refutation.into_iter().map(|x| x.to_string()).collect();
         self
     }
 
     /// Consumes `self` and adds the provided `currline` value.
+    #[must_use]
+    #[inline(always)]
     pub fn currline<T: fmt::Display>(mut self, currline: impl IntoIterator<Item = T>) -> Self {
         self.currline = currline.into_iter().map(|x| x.to_string()).collect();
         self
@@ -1167,6 +1217,8 @@ pub struct UciOption<T = String, INT = i32> {
 
 impl<T, INT> UciOption<T, INT> {
     /// Create a new [`UciOption`] with the provided name and type.
+    #[must_use]
+    #[inline(always)]
     pub fn new(name: impl Into<T>, opt_type: UciOptionType<INT>) -> Self {
         Self {
             name: name.into(),
@@ -1175,6 +1227,8 @@ impl<T, INT> UciOption<T, INT> {
     }
 
     /// Create a new [`UciOption`] of type [`UciOptionType::Check`].
+    #[must_use]
+    #[inline(always)]
     pub fn check(name: impl Into<T>, default: impl Into<bool>) -> Self {
         Self::new(
             name,
@@ -1185,6 +1239,8 @@ impl<T, INT> UciOption<T, INT> {
     }
 
     /// Create a new [`UciOption`] of type [`UciOptionType::Spin`].
+    #[must_use]
+    #[inline(always)]
     pub fn spin(
         name: impl Into<T>,
         default: impl Into<INT>,
@@ -1202,6 +1258,8 @@ impl<T, INT> UciOption<T, INT> {
     }
 
     /// Create a new [`UciOption`] of type [`UciOptionType::Combo`].
+    #[must_use]
+    #[inline(always)]
     pub fn combo<S: fmt::Display>(
         name: impl Into<T>,
         default: S,
@@ -1217,11 +1275,15 @@ impl<T, INT> UciOption<T, INT> {
     }
 
     /// Create a new [`UciOption`] of type [`UciOptionType::Button`].
+    #[must_use]
+    #[inline(always)]
     pub fn button(name: impl Into<T>) -> Self {
         Self::new(name, UciOptionType::Button)
     }
 
     /// Create a new [`UciOption`] of type [`UciOptionType::String`].
+    #[must_use]
+    #[inline(always)]
     pub fn string(name: impl Into<T>, default: impl fmt::Display) -> Self {
         Self::new(
             name,

@@ -34,6 +34,7 @@ pub enum Piece {
 impl FromStr for Piece {
     type Err = String;
     /// Attempts to construct a [`Piece`] from a case-insensitive string the UCI notation of `[pnbrqk]`.
+    #[inline(always)]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         piece(s).map(|x| x.1).map_err(|e| e.to_string())
     }
@@ -72,6 +73,7 @@ pub enum File {
 impl FromStr for File {
     type Err = String;
     /// Attempts to construct a [`Rank`] from a string in UCI notation.
+    #[inline(always)]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         file(s).map(|x| x.1).map_err(|e| e.to_string())
     }
@@ -101,6 +103,7 @@ pub enum Rank {
 impl FromStr for Rank {
     type Err = String;
     /// Attempts to construct a [`Rank`] from a string in UCI notation.
+    #[inline(always)]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         rank(s).map(|x| x.1).map_err(|e| e.to_string())
     }
@@ -120,6 +123,7 @@ pub struct Square(pub File, pub Rank);
 impl FromStr for Square {
     type Err = String;
     /// Attempts to construct a [`Square`] from a string in UCI notation.
+    #[inline(always)]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         square(s).map(|x| x.1).map_err(|e| e.to_string())
     }
@@ -148,6 +152,7 @@ pub struct UciMove {
 impl FromStr for UciMove {
     type Err = String;
     /// Attempts to construct a [`UciMove`] from a string in UCI notation.
+    #[inline(always)]
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         uci_move(s).map(|x| x.1).map_err(|e| e.to_string())
     }
@@ -165,31 +170,37 @@ impl fmt::Display for UciMove {
 }
 
 /// Parses a case-insensitive `P` to a [`Piece::Pawn`].
+#[inline(always)]
 fn pawn(input: &str) -> IResult<&str, Piece> {
     value(Piece::Pawn, one_of("Pp"))(input)
 }
 
 /// Parses a case-insensitive `K` to a [`Piece::Knight`].
+#[inline(always)]
 fn knight(input: &str) -> IResult<&str, Piece> {
     value(Piece::Knight, one_of("Nn"))(input)
 }
 
 /// Parses a case-insensitive `B` to a [`Piece::Bishop`].
+#[inline(always)]
 fn bishop(input: &str) -> IResult<&str, Piece> {
     value(Piece::Bishop, one_of("Bb"))(input)
 }
 
 /// Parses a case-insensitive `R` to a [`Piece::Rook`].
+#[inline(always)]
 fn rook(input: &str) -> IResult<&str, Piece> {
     value(Piece::Rook, one_of("Rr"))(input)
 }
 
 /// Parses a case-insensitive `Q` to a [`Piece::Queen`].
+#[inline(always)]
 fn queen(input: &str) -> IResult<&str, Piece> {
     value(Piece::Queen, one_of("Qq"))(input)
 }
 
 /// Parses a case-insensitive `K` to a [`Piece::King`].
+#[inline(always)]
 fn king(input: &str) -> IResult<&str, Piece> {
     value(Piece::King, one_of("Kk"))(input)
 }
@@ -232,11 +243,13 @@ fn rank(input: &str) -> IResult<&str, Rank> {
 }
 
 /// Parses a square on a chessboard in UCI file-rank notation.
+#[inline(always)]
 fn square(input: &str) -> IResult<&str, Square> {
     map(pair(file, rank), |(f, r)| Square(f, r))(input)
 }
 
 /// Parses a UCI nullmove, represented by `0000`.
+#[inline(always)]
 fn nullmove(input: &str) -> IResult<&str, UciMove> {
     value(UciMove::default(), tag("0000"))(input)
 }
