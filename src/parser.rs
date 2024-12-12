@@ -11,7 +11,7 @@ use nom::{
     bytes::complete::{tag, take_until},
     character::complete::{anychar, digit1, multispace0, multispace1},
     combinator::{cut, eof, map, map_res, opt, recognize, value, verify},
-    multi::{many0_count, many1, many1_count, many_till},
+    multi::{many0, many0_count, many1_count, many_till},
     sequence::{delimited, pair, preceded},
     Err, IResult,
 };
@@ -258,7 +258,7 @@ fn rest_after<'a>(ident: &'a str) -> impl FnMut(&'a str) -> IResult<&'a str, &'a
 fn moves_after<'a>(ident: &'a str) -> impl FnMut(&'a str) -> IResult<&'a str, Vec<&'a str>> {
     preceded(
         term(ident),
-        cut(many1(delimited(
+        cut(many0(delimited(
             multispace0,
             recognize(uci_move),
             multispace0,
