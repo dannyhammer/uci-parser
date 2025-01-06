@@ -11,7 +11,7 @@ use nom::{
     bytes::complete::{tag, take_until},
     character::complete::{anychar, digit1, multispace0, multispace1},
     combinator::{cut, eof, map, map_res, opt, recognize, value, verify},
-    multi::{many0, many0_count, many1_count, many_till},
+    multi::{many0_count, many1_count, many_till},
     sequence::{delimited, pair, preceded},
     Err, IResult,
 };
@@ -258,7 +258,7 @@ fn rest_after<'a>(ident: &'a str) -> impl FnMut(&'a str) -> IResult<&'a str, &'a
 fn moves_after<'a>(ident: &'a str) -> impl FnMut(&'a str) -> IResult<&'a str, Vec<&'a str>> {
     preceded(
         term(ident),
-        cut(many0(delimited(
+        cut(nom::multi::many0(delimited(
             multispace0,
             recognize(uci_move),
             multispace0,
@@ -270,7 +270,11 @@ fn moves_after<'a>(ident: &'a str) -> impl FnMut(&'a str) -> IResult<&'a str, Ve
 fn moves_after<'a>(ident: &'a str) -> impl FnMut(&'a str) -> IResult<&'a str, Vec<UciMove>> {
     preceded(
         term(ident),
-        cut(many1(delimited(multispace0, uci_move, multispace0))),
+        cut(nom::multi::many1(delimited(
+            multispace0,
+            uci_move,
+            multispace0,
+        ))),
     )
 }
 
@@ -737,6 +741,27 @@ mod tests {
         new_err("  go   movestogo    ");
 
         new_err("  go   movestogo   mate ");
+    }
+
+    #[test]
+    fn test_parse_errors() {
+        let unknown = "shutdown".parse::<UciCommand>();
+        assert!(matches!(
+            unknown.unwrap_err(),
+            UciParseError::UnrecognizedCommand { cmd: _ }
+        ));
+
+        let invalid = "position default".parse::<UciCommand>();
+        assert!(matches!(
+            invalid.unwrap_err(),
+            UciParseError::InvalidArgument { cmd: _, arg: _ }
+        ));
+
+        let insufficient = "setoption".parse::<UciCommand>();
+        assert!(matches!(
+            insufficient.unwrap_err(),
+            UciParseError::InsufficientArguments { cmd: _ }
+        ));
     }
 
     #[test]

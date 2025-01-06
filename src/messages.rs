@@ -633,9 +633,13 @@ impl fmt::Display for UciSearchOptions {
 pub enum UciResponse<T = String> {
     /// ```text
     /// id name <x>
+    /// ```
+    Name(T),
+
+    /// ```text
     /// id author <x>
     /// ```
-    Id { name: T, author: T },
+    Author(T),
 
     /// ```text
     /// uciok
@@ -680,11 +684,25 @@ pub enum UciResponse<T = String> {
 }
 
 impl UciResponse {
-    /// Convenience wrapper for creating a [`UciResponse::Info`] variant.
+    /// Convenience wrapper for creating a [`UciResponse::Info`] variant without needing to specify a generic parameter.
     #[must_use]
     #[inline(always)]
     pub fn info(info: impl Into<UciInfo>) -> Self {
         Self::Info(Box::new(info.into()))
+    }
+
+    /// Convenience wrapper for creating a [`UciResponse::UciOk`] variant without needing to specify a generic parameter.
+    #[must_use]
+    #[inline(always)]
+    pub fn uciok() -> Self {
+        Self::UciOk
+    }
+
+    /// Convenience wrapper for creating a [`UciResponse::ReadyOk`] variant without needing to specify a generic parameter.
+    #[must_use]
+    #[inline(always)]
+    pub fn readyok() -> Self {
+        Self::ReadyOk
     }
 }
 
@@ -702,7 +720,8 @@ impl<T: fmt::Display> fmt::Display for UciResponse<T> {
     /// Responses are formatted to display appropriately according to the UCI specifications.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Id { name, author } => write!(f, "id name {name}\nid author {author}"),
+            Self::Name(name) => write!(f, "id name {name}"),
+            Self::Author(author) => write!(f, "id author {author}"),
             Self::UciOk => write!(f, "uciok"),
             Self::ReadyOk => write!(f, "readyok"),
             Self::BestMove { bestmove, ponder } => match (bestmove, ponder) {
