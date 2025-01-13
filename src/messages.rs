@@ -6,7 +6,7 @@
 
 use std::{fmt, str::FromStr, time::Duration};
 
-use crate::{parse_uci_command, UciParseError};
+use crate::{parse_uci_command, parse_uci_response, UciParseError};
 
 #[cfg(feature = "types")]
 use crate::UciMove;
@@ -684,6 +684,12 @@ pub enum UciResponse<T = String> {
 }
 
 impl UciResponse {
+    /// Attempt to parse `input` into a valid [`UciResponse`].
+    #[inline(always)]
+    pub fn new(input: &str) -> Result<Self, UciParseError> {
+        parse_uci_response(input)
+    }
+
     /// Convenience wrapper for creating a [`UciResponse::Info`] variant without needing to specify a generic parameter.
     #[must_use]
     #[inline(always)]
@@ -713,6 +719,15 @@ impl<T: fmt::Display> UciResponse<T> {
     pub fn info_string(s: T) -> Self {
         let info = UciInfo::new().string(s);
         Self::Info(Box::new(info))
+    }
+}
+
+impl FromStr for UciResponse {
+    type Err = UciParseError;
+    /// Alias for [`UciResponse::new`].
+    #[inline(always)]
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::new(s)
     }
 }
 
