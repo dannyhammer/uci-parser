@@ -21,6 +21,11 @@ use crate::{UciCommand, UciParseError, UciSearchOptions};
 #[cfg(feature = "types")]
 use crate::{uci_move, UciMove};
 
+#[cfg(feature = "validate-promotion-moves")]
+use nom::character::complete::char;
+#[cfg(feature = "validate-promotion-moves")]
+use nom::combinator::not;
+
 #[cfg(not(feature = "types"))]
 use nom::{character::complete::one_of, sequence::tuple};
 
