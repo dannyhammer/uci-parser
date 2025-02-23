@@ -275,7 +275,7 @@ fn moves_after<'a>(ident: &'a str) -> impl FnMut(&'a str) -> IResult<&'a str, Ve
 fn moves_after<'a>(ident: &'a str) -> impl FnMut(&'a str) -> IResult<&'a str, Vec<UciMove>> {
     preceded(
         term(ident),
-        cut(nom::multi::many1(delimited(
+        cut(nom::multi::many0(delimited(
             multispace0,
             uci_move,
             multispace0,
