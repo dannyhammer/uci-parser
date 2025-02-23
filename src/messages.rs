@@ -801,7 +801,10 @@ impl fmt::Display for UciScoreType {
     }
 }
 
-/// Represents
+/// A "score" in the game of chess.
+///
+/// Usually in the form of [centipawns](https://www.chessprogramming.org/Centipawns) or "mate in `n` moves"
+/// and may optionally be an upper/lower bound.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UciScore {
     /// The score value, which is either a centipawn value or moves-to-mate,
