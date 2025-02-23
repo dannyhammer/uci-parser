@@ -578,19 +578,19 @@ impl fmt::Display for UciSearchOptions {
         }
 
         if let Some(wtime) = self.wtime {
-            write!(f, " wtime {}", wtime.subsec_millis())?;
+            write!(f, " wtime {}", wtime.as_millis())?;
         }
 
         if let Some(btime) = self.btime {
-            write!(f, " btime {}", btime.subsec_millis())?;
+            write!(f, " btime {}", btime.as_millis())?;
         }
 
         if let Some(winc) = self.winc {
-            write!(f, " winc {}", winc.subsec_millis())?;
+            write!(f, " winc {}", winc.as_millis())?;
         }
 
         if let Some(binc) = self.binc {
-            write!(f, " binc {}", binc.subsec_millis())?;
+            write!(f, " binc {}", binc.as_millis())?;
         }
 
         if let Some(movestogo) = self.movestogo {
@@ -606,7 +606,7 @@ impl fmt::Display for UciSearchOptions {
         }
 
         if let Some(movetime) = self.movetime {
-            write!(f, " movetime {}", movetime.subsec_millis())?;
+            write!(f, " movetime {}", movetime.as_millis())?;
         }
 
         if self.infinite {
